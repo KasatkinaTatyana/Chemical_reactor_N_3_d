@@ -7,6 +7,7 @@ global y_0 y_End
 global t_0
 global R E1 E2 A10 A20
 global k b alpha betta
+global d
 %--------------------------------------------------------------------------
 %-------------------------Константы реактора-------------------------------
 R=8.3;
@@ -24,7 +25,6 @@ g2=83.6;
 %--------------------------------------------------------------------------
 t_0=0;
 h_t=0.05;       %шаг по времени t
-c_st=[1 3 3];
 %--------------------------------------------------------------------------
 global N    %число разбиений
 N=5000;
@@ -41,20 +41,26 @@ b=(y_0(2)*y_End(1)-y_End(2)*y_0(1))/(y_End(1)-y_0(1));
 alpha = (y_0(3)-k*y_0(2))/y_0(2)/(y_0(1)-y_End(1));
 betta = (y_0(2)*y_End(3)+y_0(3)*y_End(2)-2*k*y_0(2)*y_End(2))/y_0(2)/y_End(2)/(y_End(1)-y_0(1))^2;
 %%
+d=0;
+%%
 dy=(y_End(1)-y_0(1))/N;
 
-tau_End=quad(@yCube,y_0(1),y_End(1));
+tau_End=quad(@y4Polynom,y_0(1),y_End(1));
 dtau=tau_End/N;
 %% Определение t_End
 t_End=t_0;
 for y=y_0(1):dy:y_End(1)
     y0=y;
-    y1=k*y0+b+alpha*(y0-y_0(1))*(y0-y_End(1))+betta*(y0-y_0(1))^2*(y0-y_End(1));
+    y1=k*y0+b+alpha*(y0-y_0(1))*(y0-y_End(1))+betta*(y0-y_0(1))^2*(y0-y_End(1))+...
+        d*(y0-y_0(1))^2*(y0-y_End(1))^2;
 
-    y2=(k+alpha*(y0-y_0(1))+alpha*(y0-y_End(1))+2*betta*(y0-y_0(1))*(y0-y_End(1))+betta*(y0-y_0(1))^2)*y1;
+    y2=(k+alpha*(y0-y_0(1))+alpha*(y0-y_End(1))+2*betta*(y0-y_0(1))*(y0-y_End(1))+betta*(y0-y_0(1))^2+...
+        2*d*( (y0-y_0(1))*(y0-y_End(1))^2 + (y0-y_End(1))*(y0-y_0(1))^2 ) )*y1;
 
-    y3=2*(alpha+3*betta*y0-2*betta*y_0(1)-betta*y_End(1))*y1^2+...
-    (k+alpha*(y0-y_0(1))+alpha*(y0-y_End(1))+2*betta*(y0-y_0(1))*(y0-y_End(1))+betta*(y0-y_0(1))^2)^2*y1;
+    y3=2*(alpha+3*betta*y0-2*betta*y_0(1)-betta*y_End(1)+...
+        2*d*( (y0-y_0(1))^2 + 4*(y0-y_0(1))*(y0-y_End(1)) + (y0-y_End(1))^2 ))*y1^2+...
+        (k+alpha*(y0-y_0(1))+alpha*(y0-y_End(1))+2*betta*(y0-y_0(1))*(y0-y_End(1))+betta*(y0-y_0(1))^2+...
+        2*d*( (y0-y_0(1))*(y0-y_End(1))^2 + (y0-y_End(1))*(y0-y_0(1))^2 ) )^2*y1;
 
     V_y=[y0 y1 y2];
     
@@ -66,27 +72,32 @@ t_End
 %% Моделирование исходной системы в реальном времени t
 x_r=x_0; tau=t_0;
 i=1;
+
+c=0.5;
+mas_u = zeros(round(t_End/h_t)+1);
 for t=t_0:h_t:t_End
     y_r=YTrans(x_r(i,:));
     
     U=Control(tau);
-    v=U(1,1);
-    f_tau=U(2,1);
-    g_tau=U(3,1);
+
     y_tau=U(4:6,1);
     
     f_r=fKan(y_r);
     g_r=gKan(y_r);
-%     if (norm(y_r - y_tau',1)>0.000001)
-%         v=(-f_r+U(7,1) - 1*(y_r(1) - y_tau(1)) - 3*(y_r(2) - y_tau(2)) - 3*(y_r(3) - y_tau(3)) )/g_r;
-%     end
-    
+
+    v=(-f_r+U(7,1) - 3*c*(y_r(3) - y_tau(3)) - 3*c^2*(y_r(2) - y_tau(2)) - c^3*(y_r(1) - y_tau(1)))/g_r;    % стабилизирующее управление
     % u - реальное управление, которое должно лежать в диапазоне [0; 1]
     u=( v / s(x_r(i,:)) - g1*k1(x_r(i,3))*x_r(i,1)^2 - g2*k2(x_r(i,3))*x_r(i,2)...
         - a0 - a1*(x_r(i,3)-273) ) / (b0+b1*(x_r(i,3)-273));
     
-    T=InvStateDiff(y_tau);
-    h_tau = h_t / s([y_tau(1) -y_tau(2) T]);
+%     if (u < 0)
+%         u = 0;
+%     end
+%     if (u > 1)
+%         u = 1;
+%     end
+    
+    h_tau = h_t / s(x_r(i,:));
     
     x_r(i+1,1)=x_r(i,1)+(-k1(x_r(i,3))*x_r(i,1)^2)*h_t;
     x_r(i+1,2)=x_r(i,2)+( k1(x_r(i,3))*x_r(i,1)^2 - k2(x_r(i,3))*x_r(i,2) )*h_t;
@@ -98,3 +109,31 @@ end
 
 disp(x_r(end,:));
 disp(U(4:6,1));
+
+figure(1);
+title('Зависимость концентрации CA от времени t');
+tx = t_0:h_t:t_End;
+plot(tx,x_r(:,1));
+xlabel('t, c');
+ylabel('CA');
+
+figure(2);
+title('Зависимость концентрации CB от времени t');
+tx = t_0:h_t:t_End;
+plot(tx,x_r(:,1));
+xlabel('t, c');
+ylabel('CB');
+
+figure(3);
+title('Зависимость температуры T от времени t');
+tx = t_0:h_t:t_End;
+plot(tx,x_r(:,1));
+xlabel('t, c');
+ylabel('T, K');
+
+figure(4);
+title('Зависимость управления u от времени t');
+tx = t_0:h_t:t_End;
+plot(tx,x_r(:,1));
+xlabel('t, c');
+ylabel('u');
