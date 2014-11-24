@@ -68,17 +68,26 @@ subplot(2,1,1);
 hold on 
 axis([0 1.1 -0.008 0])
 grid on
-plot(x_p,y_p,'Linewidth',1);
-xlabel('y');
-ylabel('\Psi_1(y)');
 plot(y_0(1),y_0(2),'o','MarkerEdgeColor','k',...
                        'MarkerFaceColor','g',...
                        'MarkerSize',10);
+legend('P_0');
+plot(x_p,y_p,'Linewidth',1);
+xlabel('y');
+ylabel('\Psi_1(y)');
+
 %--------------------------------------------------------------------------
 subplot(2,1,2);
 hold on
 grid on
 axis([0 1.1 -1 0.1])
+plot(y_0(1),y_0(2),'o','MarkerEdgeColor','k',...
+                       'MarkerFaceColor','g',...
+                       'MarkerSize',10);
+plot(y_End(1),y_End(2),'s','MarkerEdgeColor','k',...
+                       'MarkerFaceColor','g',...
+                       'MarkerSize',10);
+legend('P_0','P_*','Location','SouthEast');
 plot(x_p,y_p,'Linewidth',2);
 T=[];
 Y=[];
@@ -89,7 +98,8 @@ len = length(T);
 
 plot(T,Y,'Linewidth',2);
 xlabel('y');
-
+h=ylabel('\frac{dy}{d\tau}');
+set(h,'Interpreter','tex')
 %------------------------------Штриховка-----------------------------------
 di = (len-1)/10;
 for i=1:di:len
@@ -102,9 +112,3 @@ for i=1:di:len
     end
 end
 %--------------------Начальная, конечная точка-----------------------------
-plot(y_0(1),y_0(2),'o','MarkerEdgeColor','k',...
-                       'MarkerFaceColor','g',...
-                       'MarkerSize',10);
-plot(y_End(1),y_End(2),'o','MarkerEdgeColor','k',...
-                       'MarkerFaceColor','g',...
-                       'MarkerSize',10);
